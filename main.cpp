@@ -1,7 +1,7 @@
 #define _CRT_SECURE_NO_WARNINGS
-#include <glew.h>
-#include <glut.h>
-#include <glfw3.h>
+#include <include/GL/glew.h>
+#include <GL/glut.h>
+#include <GLFW/glfw3.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -442,19 +442,19 @@ void DrawUpdated() {
     glRotatef(rotateY, 0.0, 1.0, 0.0);
     glRotatef(rotateZ, 0.0, 0.0, 1.0);
 
-    // ќсь x
+    // –Ю—Б—М x
     glBegin(GL_LINES);
     glVertex3f(-100.0, 0.0, 0.0);
     glVertex3f(100.0, 0.0, 0.0);
     glEnd();
 
-    // ќсь y
+    // –Ю—Б—М y
     glBegin(GL_LINES);
     glVertex3f(0.0, -100.0, 0.0);
     glVertex3f(0.0, 100.0, 0.0);
     glEnd();
 
-    // ќсь z
+    // –Ю—Б—М z
     glBegin(GL_LINES);
     glVertex3f(0.0, 0.0, -100.0);
     glVertex3f(0.0, 0.0, 100.0);
