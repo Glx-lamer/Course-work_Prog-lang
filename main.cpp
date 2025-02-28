@@ -1,11 +1,12 @@
 #define _CRT_SECURE_NO_WARNINGS
-#include <include/GL/glew.h>
-#include <GL/glut.h>
-#include <GLFW/glfw3.h>
+#include <glew.h>
+#include <glut.h>
+#include <glfw3.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
+#include <time.h>
 
 #define MAX_EXPRESSION_LENGTH 100
 
@@ -193,7 +194,7 @@ void add(struct Dict* dict, const char* key, int value) {
 int get(struct Dict* dict, const char* key) {
     struct DictNode* curr = dict->head;
     while (curr != NULL) {
-        if (strcmp(curr->key, key) == 0) {
+        if (curr->key[0] == key[0] && strcmp(curr->key, key) == 0) {
             return curr->value;
         }
         curr = curr->next;
@@ -219,8 +220,13 @@ void createDictOperations(struct Dict* dict) {
     add(dict, "arctan", 111);
 }
 
+struct Dict* DictOperations;
+
 void Dijkstra(char* operation, struct Dict* dict, struct Queue* queue, struct Stack** stack) {
-    if (get(dict, operation) == -1) {
+    
+    int value = get(dict, operation);
+
+    if (value == -1) {
         char* temp;
         do {
             temp = pop(stack);
@@ -229,11 +235,11 @@ void Dijkstra(char* operation, struct Dict* dict, struct Queue* queue, struct St
             }
         } while (get(dict, temp) != 1);
     }
-    else if (get(dict, operation) == 1) {
+    else if (value == 1) {
         push(stack, operation);
     }
     else {
-        while (*stack != NULL && OperationWeight(get(dict, operation)) <= OperationWeight(get(dict, (*stack)->data))) {
+        while (*stack != NULL && OperationWeight(value) <= OperationWeight(get(dict, (*stack)->data))) {
             enqueue(queue, pop(stack));
         }
         push(stack, operation);
@@ -410,26 +416,68 @@ double calculate_expression(char* expression, double x, double y) {
     return popRes(&resstack);
 }
 
-void computePoints(char* expression) {
+double BilinearInterpolation(double x, double y, double x1, double x2, double y1, double y2, double q11, double q12, double q21, double q22) {
+    double s1 = (q11 * (x2 - x) * (y2 - y)) / ((x2 - x1) * (y2 - y1));
+    double s2 = (q21 * (x - x1) * (y2 - y)) / ((x2 - x1) * (y2 - y1));
+    double s3 = (q12 * (x2 - x) * (y - y1)) / ((x2 - x1) * (y2 - y1));
+    double s4 = (q22 * (x - x1) * (y - y1)) / ((x2 - x1) * (y2 - y1));
+    return s1 + s2 + s3 + s4;
+}
 
+void computePoints(char* expression) {
     int index = 0;
+
+    clock_t start = clock();
+
+    int DimSize = (int)((diapEnd - diapStart) / diapStep) + 1;
+
+    points = (struct Point*)calloc(DimSize * DimSize, sizeof(struct Point));
+
+    for (double x = diapStart; x <= diapEnd; x += diapStep * 10) {
+        for (double y = diapStart; y <= diapEnd; y += diapStep * 10) {
+            double z = calculate_expression(expression, x, y);
+
+            int cX = (int)((x - diapStart) / diapStep);
+            int cY = (int)((y - diapStart) / diapStep);
+            int cIndex = cX * DimSize + cY;
+
+            points[cIndex].x = x;
+            points[cIndex].y = y;
+            points[cIndex].z = z;
+        }
+    }
 
     for (double x = diapStart; x <= diapEnd; x += diapStep) {
         for (double y = diapStart; y <= diapEnd; y += diapStep) {
-            double z = calculate_expression(expression, x, y);
-            if (index == 0) {
-                points = (struct Point*)malloc(sizeof(struct Point));
+
+            int fX = (int)((x - diapStart) / diapStep);
+            int fY = (int)((y - diapStart) / diapStep);
+            int fIndex = fX * DimSize + fY;
+
+            if (fX % 10 != 0 || fY % 10 != 0) {
+
+                int coarseX1 = (fX / 10) * 10;
+                int coarseX2 = coarseX1 + 10;
+                int coarseY1 = (fY / 10) * 10;
+                int coarseY2 = coarseY1 + 10;
+
+                int q11 = coarseX1 * DimSize + coarseY1;
+                int q12 = coarseX1 * DimSize + coarseY2;
+                int q21 = coarseX2 * DimSize + coarseY1;
+                int q22 = coarseX2 * DimSize + coarseY2;
+
+                double z = BilinearInterpolation(x, y, points[q11].x, points[q21].x, points[q11].y, points[q12].y, points[q11].z, points[q12].z, points[q21].z, points[q22].z);
+
+                points[fIndex].x = x;
+                points[fIndex].y = y;
+                points[fIndex].z = z;
             }
-            else {
-                points = (struct Point*)realloc(points, (index + 1) * sizeof(struct Point));
-            }
-            struct Point* point = (struct Point*)malloc(sizeof(struct Point));
-            point->x = x;
-            point->y = y;
-            point->z = z;
-            points[index++] = *point;
         }
     }
+
+    clock_t end = clock();
+
+    printf(">>> Time to calc: %lf msec\n", (double)(end - start) / (CLOCKS_PER_SEC / 1000));
 }
 
 void DrawUpdated() {
@@ -442,19 +490,19 @@ void DrawUpdated() {
     glRotatef(rotateY, 0.0, 1.0, 0.0);
     glRotatef(rotateZ, 0.0, 0.0, 1.0);
 
-    // –û—Å—å x
+    // ŒÒ¸ x
     glBegin(GL_LINES);
     glVertex3f(-100.0, 0.0, 0.0);
     glVertex3f(100.0, 0.0, 0.0);
     glEnd();
 
-    // –û—Å—å y
+    // ŒÒ¸ y
     glBegin(GL_LINES);
     glVertex3f(0.0, -100.0, 0.0);
     glVertex3f(0.0, 100.0, 0.0);
     glEnd();
 
-    // –û—Å—å z
+    // ŒÒ¸ z
     glBegin(GL_LINES);
     glVertex3f(0.0, 0.0, -100.0);
     glVertex3f(0.0, 0.0, 100.0);
@@ -464,7 +512,9 @@ void DrawUpdated() {
 
     glBegin(GL_POINTS);
 
-    for (int i = 1; i < ((diapEnd - diapStart) / diapStep) * ((diapEnd - diapStart) / diapStep); ++i) {
+    int DimPoints = (diapEnd - diapStart) / diapStep;
+
+    for (int i = 1; i < DimPoints * DimPoints; ++i) {
         glVertex3f(points[i].x, points[i].y, points[i].z);
     }
 
@@ -550,6 +600,9 @@ int main(int argc, char** argv) {
     printf("Type expression:\n");
     fgets(userExpression, MAX_EXPRESSION_LENGTH, stdin);
     userExpression[strcspn(userExpression, "\n")] = 0;
+
+    DictOperations = createDict();
+    createDictOperations(DictOperations);
 
     computePoints(userExpression);
 
