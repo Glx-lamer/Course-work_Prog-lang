@@ -1,3 +1,4 @@
+# Course work on "Programming Languages"
 ## Program profiling
 
 - Added `<time.h>` header and used `clock()` func for determination of the program execution time in `computePoints()`
